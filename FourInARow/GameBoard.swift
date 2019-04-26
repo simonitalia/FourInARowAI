@@ -10,7 +10,7 @@ import UIKit
 import GameplayKit
 
 //enum to create and track chips in slots. Note! red assigned 1, black assigned 2 by iOS since we declared Int explicityly and 1st case = 0
-enum Chip: Int {
+enum Chip: Int { //ChipColor -> Chip
     case none = 0
     case red
     case black
@@ -85,6 +85,48 @@ class GameBoard: NSObject, GKGameModel {
         }
     }
     
+    //Optional: This method informs the AI how the game is won (and lost)
+    func isWin(for player: GKGameModelPlayer) -> Bool {
+        
+        let chip = (player as! Player).chip
+        
+        for row in 0 ..< GameBoard.rows {
+            for column in 0 ..< GameBoard.columns {
+                if doSquaresMatch(initialChip: chip, row: row, column: column, moveX: 1, moveY: 0) {
+                    return true
+                    
+                } else if doSquaresMatch(initialChip: chip, row: row, column: column, moveX: 0, moveY: 1) {
+                    return true
+                    
+                } else if doSquaresMatch(initialChip: chip, row: row, column: column, moveX: 1, moveY: 1) {
+                    return true
+                    
+                } else if doSquaresMatch(initialChip: chip, row: row, column: column, moveX: 1, moveY: -1) {
+                    return true
+                }
+            }
+        }
+        
+        return false
+    }
+    
+    //Optional: Score method to inform the AI of the quality of a move
+    func score(for player: GKGameModelPlayer) -> Int {
+        
+        //if current player wins,
+        if let playerObject = player as? Player {
+            if isWin(for: playerObject) {
+                return 1000
+                
+            } else if isWin(for: playerObject.opponent) {
+                return -1000
+            }
+        }
+        
+        //If noone wins
+        return 0
+    }
+    
     //---
     
     //Current Player property
@@ -101,6 +143,7 @@ class GameBoard: NSObject, GKGameModel {
     override init() {
         currentPlayer = Player.allPlayers[0]
         
+        //Populate slots array with .none chips for all board slots (42)
         for _ in 0 ..< GameBoard.columns * GameBoard.rows {
             slots.append(.none)
         }
@@ -114,14 +157,18 @@ class GameBoard: NSObject, GKGameModel {
     }
     
     //Check which chip color (if any) occuipes each board slot
-    func chip(inColumn column: Int, row: Int) -> Chip {
+    func chip(in column: Int, row: Int) -> Chip {
+        //inColumn -> in
+        
         return slots[row + column * GameBoard.rows]
+            //inColumn -> in
+        
     }
     
     //Helper method to determine if row in a specific column is free by moving up rows. (Will return first row no. if free, or nil if not)
-    func nextEmptySlot(in column: Int) -> Int? {
+    func nextSlotEmpty(in column: Int) -> Int? {
         for row in 0 ..< GameBoard.rows {
-            if chip(inColumn: column, row: row) == .none {
+            if chip(in: column, row: row) == .none {
                 return row
             }
         }
@@ -131,17 +178,16 @@ class GameBoard: NSObject, GKGameModel {
     
     //Determine if user can move chip in a specific column by calling nextEmptySlot(in:) method and returning true or false
     func canMove(in column: Int) -> Bool {
-        return nextEmptySlot(in: column) != nil
+        return nextSlotEmpty(in: column) != nil
     }
     
     //Place chip in slot depending on result of emptySlot(in:) method
     func add(chip: Chip, in column: Int) {
-        if let row = nextEmptySlot(in: column) {
+        if let row = nextSlotEmpty(in: column) {
             set(chip: chip, in: column, row: row)
         }
     }
-    
-    //End of Game method, where players draw
+
     func isFull() -> Bool {
         
         //Check all columns to see if board is full or not
@@ -154,65 +200,21 @@ class GameBoard: NSObject, GKGameModel {
         return true
     }
     
-    //End of Game method when a player wins
-    func isWin(for player: GKGameModelPlayer) -> Bool {
-        
-        let chip = (player as! Player).chip
-        
-        for row in 0 ..< GameBoard.rows {
-            for col in 0 ..< GameBoard.columns {
-                if doSquaresMatch(initialChip: chip, row: row, col: col, moveX: 1, moveY: 0) {
-                        return true
-                    
-                } else if doSquaresMatch(initialChip: chip, row: row, col: col, moveX: 0, moveY: 1) {
-                    return true
-                
-                } else if doSquaresMatch(initialChip: chip, row: row, col: col, moveX: 1, moveY: 1) {
-                        return true
-                
-                } else if doSquaresMatch(initialChip: chip, row: row, col: col, moveX: 1, moveY: -1) {
-                    return true
-                }
-            }
-        }
-        
-       return false
-    }
-    
-    func doSquaresMatch(initialChip: Chip, row: Int, col: Int, moveX: Int, moveY: Int) -> Bool {
+    func doSquaresMatch(initialChip: Chip, row: Int, column: Int, moveX: Int, moveY: Int) -> Bool {
+        //col: -> column
         
         //If a win is not pssoible from here, exit method
         if row + (moveY * 3) < 0 { return false }
         if row + (moveY * 3) >= GameBoard.rows { return false }
-        if col + (moveX * 3) < 0 { return false }
-        if col + (moveX * 3) >= GameBoard.columns { return false}
+        if column + (moveX * 3) < 0 { return false }
+        if column + (moveX * 3) >= GameBoard.columns { return false}
         
         //Else check each sqaure for a win
-        if chip(inColumn: col, row: row) != initialChip { return false }
-        if chip(inColumn: col + moveX, row: row + moveY) != initialChip { return false }
-        if chip(inColumn: col + (moveX * 2), row: row + (moveY * 2)) != initialChip { return false }
-        if chip(inColumn: col + (moveX * 3), row: row + (moveY * 3)) != initialChip { return false }
+        if chip(in: column, row: row) != initialChip { return false }
+        if chip(in: column + moveX, row: row + moveY) != initialChip { return false }
+        if chip(in: column + (moveX * 2), row: row + (moveY * 2)) != initialChip { return false }
+        if chip(in: column + (moveX * 3), row: row + (moveY * 3)) != initialChip { return false }
 
         return true
     }
-    
-    //Score method to inform the AI of the quality of a move
-    func score(for player: GKGameModelPlayer) -> Int {
-        
-        //if current player wins, 
-        if let playerObject = player as? Player {
-            if isWin(for: playerObject) {
-                return 1000
-                
-            } else if isWin(for: playerObject.opponent) {
-                return -1000
-            }
-        }
-        
-        //If noone wins
-        return 0
-    }
-    
-    
-    
 }

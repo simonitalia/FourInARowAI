@@ -7,8 +7,12 @@
 //
 
 import UIKit
+import GameplayKit
 
 class ViewController: UIViewController {
+    
+    //
+    var minMaxStrategist: GKMinmaxStrategist!
     
     //Track all the placedChips on the board
     var placedChips = [[UIView]]()
@@ -22,11 +26,11 @@ class ViewController: UIViewController {
     @IBAction func makeMove(_ sender: UIButton) {
         
         let column = sender.tag
-        if let row = board.nextEmptySlot(in: column) {
+        if let row = board.nextSlotEmpty(in: column) {
             
             board.add(chip: board.currentPlayer.chip, in: column)
-            addChip(inColumn: column, row: row, color: board.currentPlayer.color)
-            continueGame()            
+            addChip(in: column, row: row, color: board.currentPlayer.color)
+            continueOrEndGame()            
         }
     }
     
@@ -39,11 +43,20 @@ class ViewController: UIViewController {
             placedChips.append([UIView]())
         }
         
+        //Configure MinMaxStrategist AI
+        minMaxStrategist = GKMinmaxStrategist()
+        minMaxStrategist.maxLookAheadDepth = 7
+        minMaxStrategist.randomSource = GKARC4RandomSource()
+            //If there is a tie between bets moves, randomly select one
+        
         resetGameBoard()
     }
     
     func resetGameBoard() {
         board = GameBoard()
+        minMaxStrategist.gameModel = board
+            //Inform the AI of the Game Model
+        
         updateUI()
         
         //Loop through placedChips array and remove each chip (UIView)
@@ -61,8 +74,10 @@ class ViewController: UIViewController {
         }
     }
     
-    //Method that places chip in an (allowed) slot with animation, color etc (this matches GameBoard class's add(chip: in) method.) Called when user taps on a slot
-    func addChip(inColumn column: Int, row: Int, color: UIColor) {
+    //Method that places chip in an (allowed) slot with animation, color etc (this matches GameBoard class's add(chip: in) method. Called when user taps on a slot. The x2 mthods are needed as this method makes move in the view, and add(chip: in) makes move in the game model)
+    func addChip(in column: Int, row: Int, color: UIColor) {
+        //inColumn: -> in:
+        
         let button = columnButtons[column]
         let size = min(button.frame.width, button.frame.height / 6)
         let rect = CGRect(x: 0, y: 0, width: size, height: size)
@@ -111,10 +126,15 @@ class ViewController: UIViewController {
     func updateUI() {
         title = "\(board.currentPlayer.name)'s Turn"
         
+        //Execute AI move when player Black's turn
+        if board.currentPlayer.chip == .black {
+            startAIMove()
+        }
+        
     }
     
     //Switch player or End Game
-    func continueGame() {
+    func continueOrEndGame() {
         
         //Create gameOverTitle to set when game ends
         var gameOverTitle: String? = nil
@@ -147,6 +167,63 @@ class ViewController: UIViewController {
         
     }
     
+    //Method for AI to consider / choose a column to move to
+    func columnForAIPossibleMove() -> Int? {
+        if let aiPossibleMove = minMaxStrategist.bestMove(for: board.currentPlayer) as? PossibleMove {
+                return aiPossibleMove.column
+        }
+        
+        return nil
+    }
     
+    //Place chip in AI chosen slot
+    func makeAIMove(in column: Int) {
+        if let row = board.nextSlotEmpty(in: column) {
+            board.add(chip: board.currentPlayer.chip, in: column)
+            addChip(in: column, row: row, color: board.currentPlayer.color)
+            
+            //Call to evaluate state of game after move
+            continueOrEndGame()
+        }
+        
+        //Reanble the column buttons and remove spinner
+        columnButtons.forEach { $0.isEnabled = true }
+        navigationItem.leftBarButtonItem = nil
+
+    }
+    
+    //Execute AI move
+    func startAIMove() {
+        
+        //Disable column buttons touch whilst it's the AI's turn
+        columnButtons.forEach {
+            $0.isEnabled = false
+            
+         //Create and display a spinner  in the left nav whilst it's the AI's turn
+            let spinner = UIActivityIndicatorView(style: .gray)
+            spinner.startAnimating()
+            
+            navigationItem.leftBarButtonItem = UIBarButtonItem(customView: spinner)
+        }
+        
+        //Do all the AI figuring out which column to move to, on a background thread
+        DispatchQueue.global().async { [unowned self] in
+            let minMaxStrategistTime = CFAbsoluteTimeGetCurrent()
+            
+            //Determine possible AI move, and set a min time limit
+            guard let column = self.columnForAIPossibleMove() else { return }
+            let timeDelta = CFAbsoluteTimeGetCurrent() - minMaxStrategistTime
+        
+            let aiTimeCeiling = 1.0
+            let aiTimeDelay = aiTimeCeiling - timeDelta
+            
+            //Make the move on the UI. Execute on main thread
+            DispatchQueue.main.asyncAfter(deadline: .now() + aiTimeDelay) {
+                self.makeAIMove(in: column)
+                
+            }
+        }
+    }
+
 }
 

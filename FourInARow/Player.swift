@@ -27,11 +27,11 @@ class Player: NSObject, GKGameModelPlayer {
         if chip == .red {
             
             color = .red
-            name = "Red Player"
+            name = "PLAYER ONE (RED)"
         
         } else {
             color = .black
-            name = "Black Player"
+            name = "AI (BLACK)"
         }
         
         super.init()

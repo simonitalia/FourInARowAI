@@ -10,7 +10,7 @@
 import GameplayKit
 import UIKit
 
-class PossibleMove: NSObject, GKGameModelUpdate {
+class PossibleMove: NSObject, GKGameModelUpdate { //Move -> PossibleMove
     
     //Property to conform to GKGameModelUpdate
     var value: Int = 0
